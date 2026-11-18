@@ -1,35 +1,35 @@
 
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {ThreeCanvas} from '@remotion/three';
-import {useCurrentFrame, useVideoConfig} from 'remotion';
+import {
+  useCurrentFrame,
+  useVideoConfig,
+  staticFile,
+  delayRender,
+  continueRender,
+  cancelRender,
+} from 'remotion';
 import * as THREE from 'three';
+import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 type V3 = [number, number, number];
 
+// BASIC 3D SHAPES
 const Block = ({
-  position,
-  size,
-  color,
-  rotation,
+  position, size, color,
 }: {
   position: V3;
   size: V3;
   color: string;
-  rotation?: V3;
 }) => (
-  <mesh position={position} rotation={rotation}>
+  <mesh position={position}>
     <boxGeometry args={size}/>
-    <meshStandardMaterial
-      color={color}
-      roughness={0.82}
-    />
+    <meshStandardMaterial color={color} roughness={0.8}/>
   </mesh>
 );
 
 const Ball = ({
-  position,
-  scale,
-  color,
+  position, scale, color,
 }: {
   position: V3;
   scale: V3;
@@ -37,13 +37,11 @@ const Ball = ({
 }) => (
   <mesh position={position} scale={scale}>
     <sphereGeometry args={[1, 24, 16]}/>
-    <meshStandardMaterial
-      color={color}
-      roughness={0.75}
-    />
+    <meshStandardMaterial color={color} roughness={0.75}/>
   </mesh>
 );
 
+// FLOATING PRICE TAG
 const PriceTag = () => {
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas');
@@ -69,105 +67,25 @@ const PriceTag = () => {
 
   return (
     <sprite position={[0, 3.25, 0]} scale={[1.25, 0.63, 1]}>
-      <spriteMaterial
-        map={texture}
-        transparent
-        depthTest={true}
-      />
+      <spriteMaterial map={texture} transparent/>
     </sprite>
   );
 };
 
-const Building = ({
-  x,
-  z,
-  color,
-  height,
-}: {
-  x: number;
-  z: number;
-  color: string;
-  height: number;
-}) => (
-  <group position={[x, 0, z]}>
-    <Block
-      position={[0, height / 2, 0]}
-      size={[2.5, height, 2.4]}
-      color={color}
-    />
-    <Block
-      position={[0, height + 0.16, 0]}
-      size={[2.85, 0.32, 2.75]}
-      color="#765c72"
-    />
-
-    {[1.4, 2.65].filter(y => y < height - 0.4).map(y => (
-      <group key={y}>
-        {[-0.65, 0.65].map(wx => (
-          <group key={wx}>
-            <Block
-              position={[wx, y, 1.225]}
-              size={[0.67, 0.72, 0.08]}
-              color="#e9f8ff"
-            />
-            <Block
-              position={[wx, y, 1.28]}
-              size={[0.055, 0.72, 0.03]}
-              color="#ffffff"
-            />
-          </group>
-        ))}
-      </group>
-    ))}
-
-    <Block
-      position={[0, 0.68, 1.245]}
-      size={[0.68, 1.36, 0.09]}
-      color="#80614f"
-    />
-    <Ball
-      position={[0.22, 0.7, 1.31]}
-      scale={[0.045, 0.045, 0.045]}
-      color="#ffdc6d"
-    />
-  </group>
-);
-
-const Tree = ({x, z}: {x: number; z: number}) => (
-  <group position={[x, 0, z]}>
-    <Block
-      position={[0, 0.7, 0]}
-      size={[0.2, 1.4, 0.2]}
-      color="#77513b"
-    />
-    <Ball
-      position={[0, 1.75, 0]}
-      scale={[0.78, 0.85, 0.78]}
-      color="#3d9b63"
-    />
-    <Ball
-      position={[0.35, 1.55, 0]}
-      scale={[0.5, 0.6, 0.5]}
-      color="#59b976"
-    />
-  </group>
-);
-
+// LEO CHARACTER
 const Leo = ({frame}: {frame: number}) => {
   const seconds = frame / 30;
   const walk = Math.sin(seconds * 9);
   const bob = Math.abs(walk) * 0.045;
   const blink = frame % 95 >= 91 ? 0.18 : 1;
-  const expression = frame >= 170 ? 1 : 0;
-
+  const surprised = frame >= 170;
   const x = -2.4 + seconds * 0.48;
 
   return (
     <group position={[x, bob, 0]}>
-      {/* Legs */}
       {[-1, 1].map(side => (
         <group
-          key={side}
+          key={'leg' + side}
           position={[side * 0.19, 0.78, 0]}
           rotation={[walk * side * 0.3, 0, 0]}
         >
@@ -184,24 +102,21 @@ const Leo = ({frame}: {frame: number}) => {
         </group>
       ))}
 
-      {/* Torso */}
       <Block
         position={[0, 1.34, 0]}
         size={[0.72, 0.95, 0.39]}
         color="#367fc4"
       />
 
-      {/* Hoodie pocket */}
       <Block
         position={[0, 1.13, 0.22]}
         size={[0.4, 0.22, 0.035]}
         color="#23609e"
       />
 
-      {/* Arms */}
       {[-1, 1].map(side => (
         <group
-          key={side}
+          key={'arm' + side}
           position={[side * 0.47, 1.67, 0]}
           rotation={[-walk * side * 0.24, 0, side * 0.09]}
         >
@@ -218,33 +133,32 @@ const Leo = ({frame}: {frame: number}) => {
         </group>
       ))}
 
-      {/* Neck and head */}
       <Block
         position={[0, 1.93, 0]}
         size={[0.19, 0.24, 0.19]}
         color="#ffd4b4"
       />
+
       <Ball
         position={[0, 2.34, 0]}
         scale={[0.53, 0.56, 0.47]}
         color="#ffe0c3"
       />
 
-      {/* Red and green hair */}
       <Ball
         position={[-0.25, 2.76, -0.03]}
         scale={[0.32, 0.18, 0.46]}
         color="#f04459"
       />
+
       <Ball
         position={[0.25, 2.76, -0.03]}
         scale={[0.32, 0.18, 0.46]}
         color="#25c77c"
       />
 
-      {/* Face looks toward positive Z */}
       {[-1, 1].map(side => (
-        <group key={side}>
+        <group key={'eye' + side}>
           <Ball
             position={[side * 0.2, 2.4, 0.43]}
             scale={[0.065, 0.085 * blink, 0.035]}
@@ -253,8 +167,8 @@ const Leo = ({frame}: {frame: number}) => {
           <Block
             position={[
               side * 0.2,
-              2.57 + expression * 0.035,
-              0.43
+              surprised ? 2.61 : 2.57,
+              0.43,
             ]}
             size={[0.17, 0.035, 0.04]}
             color="#633c3c"
@@ -262,13 +176,12 @@ const Leo = ({frame}: {frame: number}) => {
         </group>
       ))}
 
-      {/* Mouth */}
       <Ball
         position={[0, 2.14, 0.455]}
         scale={[
-          expression ? 0.095 : 0.13,
-          expression ? 0.12 : 0.035,
-          0.025
+          surprised ? 0.095 : 0.13,
+          surprised ? 0.12 : 0.035,
+          0.025,
         ]}
         color="#8b4550"
       />
@@ -278,6 +191,153 @@ const Leo = ({frame}: {frame: number}) => {
   );
 };
 
+// TOWN BUILDINGS
+const Building = ({
+  x, color, height,
+}: {
+  x: number;
+  color: string;
+  height: number;
+}) => (
+  <group position={[x, 0, -5.1]}>
+    <Block
+      position={[0, height / 2, 0]}
+      size={[2.5, height, 2.4]}
+      color={color}
+    />
+    <Block
+      position={[0, height + 0.16, 0]}
+      size={[2.85, 0.32, 2.75]}
+      color="#765c72"
+    />
+    {[1.4, 2.65].filter(y => y < height - 0.4).map(y =>
+      [-0.65, 0.65].map(wx => (
+        <Block
+          key={y + '-' + wx}
+          position={[wx, y, 1.225]}
+          size={[0.67, 0.72, 0.08]}
+          color="#e9f8ff"
+        />
+      ))
+    )}
+    <Block
+      position={[0, 0.68, 1.245]}
+      size={[0.68, 1.36, 0.09]}
+      color="#80614f"
+    />
+  </group>
+);
+
+// TOWN TREES
+const Tree = ({x}: {x: number}) => (
+  <group position={[x, 0, -2.9]}>
+    <Block
+      position={[0, 0.7, 0]}
+      size={[0.2, 1.4, 0.2]}
+      color="#77513b"
+    />
+    <Ball
+      position={[0, 1.75, 0]}
+      scale={[0.78, 0.85, 0.78]}
+      color="#3d9b63"
+    />
+  </group>
+);
+
+// REAL POLYFORK GLB MODEL
+const PolyforkVehicle = () => {
+  const [model, setModel] = useState<THREE.Group | null>(null);
+
+  const [handle] = useState(() =>
+    delayRender('Loading Polyfork 3D vehicle')
+  );
+
+  useEffect(() => {
+    let active = true;
+    let settled = false;
+
+    const finish = () => {
+      if (!settled) {
+        settled = true;
+        continueRender(handle);
+      }
+    };
+
+    const fail = (error: unknown) => {
+      if (!settled) {
+        settled = true;
+        cancelRender(
+          new Error('Polyfork GLB failed: ' + String(error))
+        );
+      }
+    };
+
+    const loader = new GLTFLoader();
+
+    loader.load(
+      staticFile('assets/polyfork-vehicle.glb'),
+      (gltf) => {
+        if (!active) return;
+
+        const vehicle = gltf.scene;
+
+        // Center and normalize model geometry.
+        const bounds = new THREE.Box3().setFromObject(vehicle);
+        const size = bounds.getSize(new THREE.Vector3());
+        const center = bounds.getCenter(new THREE.Vector3());
+
+        const maxDimension = Math.max(
+          size.x, size.y, size.z
+        );
+
+        if (!Number.isFinite(maxDimension) || maxDimension <= 0) {
+          fail('Model has invalid dimensions');
+          return;
+        }
+
+        // Keep original model separate from its placement.
+        const normalized = new THREE.Group();
+        vehicle.position.sub(center);
+        normalized.add(vehicle);
+
+        normalized.scale.setScalar(2.8 / maxDimension);
+
+        const scaledBounds = new THREE.Box3()
+          .setFromObject(normalized);
+
+        normalized.position.y -= scaledBounds.min.y;
+
+        normalized.traverse(object => {
+          if (object instanceof THREE.Mesh) {
+            object.castShadow = true;
+            object.receiveShadow = true;
+          }
+        });
+
+        setModel(normalized);
+        finish();
+      },
+      undefined,
+      (error) => {
+        if (active) fail(error);
+      }
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [handle]);
+
+  if (!model) return null;
+
+  return (
+    <group position={[3.5, 0.12, -1.3]}>
+      <primitive object={model}/>
+    </group>
+  );
+};
+
+// COMPLETE 3D SCENE
 const Scene = () => {
   const frame = useCurrentFrame();
   const seconds = frame / 30;
@@ -289,7 +349,6 @@ const Scene = () => {
 
   const targetX = -2.4 + seconds * 0.48;
 
-  // Smooth tracking camera
   camera.position.set(
     targetX + 3.5,
     3.8,
@@ -297,7 +356,7 @@ const Scene = () => {
   );
   camera.lookAt(targetX, 1.55, 0);
 
-  const buildingColors = [
+  const colors = [
     '#efb6a6',
     '#b9b5e8',
     '#f1d293',
@@ -319,21 +378,18 @@ const Scene = () => {
         intensity={2.4}
       />
 
-      {/* Grass */}
       <Block
         position={[0, -0.23, 0]}
         size={[40, 0.35, 24]}
         color="#8bc78e"
       />
 
-      {/* Road */}
       <Block
         position={[0, -0.035, 0]}
         size={[40, 0.08, 4.2]}
         color="#535d6b"
       />
 
-      {/* Sidewalks */}
       {[-1, 1].map(side => (
         <Block
           key={side}
@@ -343,7 +399,6 @@ const Scene = () => {
         />
       ))}
 
-      {/* Road markings */}
       {Array.from({length: 12}, (_, i) => (
         <Block
           key={i}
@@ -353,28 +408,28 @@ const Scene = () => {
         />
       ))}
 
-      {/* Buildings */}
       {Array.from({length: 9}, (_, i) => (
         <Building
           key={i}
           x={-16 + i * 4}
-          z={-5.1}
           height={3.3 + (i % 3) * 0.5}
-          color={buildingColors[i % buildingColors.length]}
+          color={colors[i % colors.length]}
         />
       ))}
 
-      {/* Trees */}
       {[-12, -6, 0, 6, 12].map(x => (
-        <Tree key={x} x={x} z={-2.9}/>
+        <Tree key={x} x={x}/>
       ))}
 
-      {/* Main character */}
       <Leo frame={frame}/>
+
+      {/* Our first real Polyfork 3D model */}
+      <PolyforkVehicle/>
     </>
   );
 };
 
+// REMOTION COMPOSITION
 export const Town3DTest: React.FC = () => {
   const {width, height} = useVideoConfig();
 
