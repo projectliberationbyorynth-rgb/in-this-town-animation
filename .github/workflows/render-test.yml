@@ -25,6 +25,15 @@ jobs:
         run: npm ci
 
       - name: Install Remotion browser
+      
+      - name: Download Polyfork asset
+        run: |
+          mkdir -p public/assets
+          curl --fail --location --retry 3 \
+            https://polyfork.dev/cdn/pop-top-camper-van-62a322.glb \
+            --output public/assets/polyfork-vehicle.glb
+          test -s public/assets/polyfork-vehicle.glb
+          
         run: npx remotion browser ensure
 
       - name: Render 3D animation
