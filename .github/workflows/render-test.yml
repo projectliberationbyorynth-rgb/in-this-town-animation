@@ -12,30 +12,39 @@ jobs:
       contents: read
 
     steps:
+      # 1. Download our project
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
 
+      # 3. Install Three.js and Remotion
       - name: Install dependencies
         run: npm ci
 
+      # 4. Install Chromium for rendering
       - name: Install Remotion browser
-      
+        run: npx remotion browser ensure
+
+      # 5. Download Polyfork 3D asset
       - name: Download Polyfork asset
         run: |
           mkdir -p public/assets
+
           curl --fail --location --retry 3 \
             https://polyfork.dev/cdn/pop-top-camper-van-62a322.glb \
             --output public/assets/polyfork-vehicle.glb
-          test -s public/assets/polyfork-vehicle.glb
-          
-        run: npx remotion browser ensure
 
+          test -s public/assets/polyfork-vehicle.glb
+
+          echo "Polyfork asset downloaded"
+
+      # 6. Render our 3D animation
       - name: Render 3D animation
         run: |
           npx remotion render \
@@ -45,6 +54,7 @@ jobs:
             --codec h264 \
             --concurrency 2
 
+      # 7. Upload the rendered video
       - name: Upload rendered MP4
         if: always()
         uses: actions/upload-artifact@v4
@@ -52,4 +62,3 @@ jobs:
           name: town-3d-test
           path: output.mp4
           if-no-files-found: warn
-          
